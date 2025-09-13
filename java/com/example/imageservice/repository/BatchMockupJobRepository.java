@@ -21,5 +21,7 @@ public interface BatchMockupJobRepository extends JpaRepository<BatchMockupJob, 
     Optional<BatchMockupJob> findByBatchJobIdAndItemId(String batchJobId, String itemId);
     
     List<BatchMockupJob> findByBatchJobIdStartingWith(String prefix);
+    
+    boolean existsByBatchJobId(String batchJobId);
 }
 

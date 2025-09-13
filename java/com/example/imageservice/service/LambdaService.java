@@ -151,6 +151,7 @@ public class LambdaService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("jobId", jobId);
         payload.put("requests", requests); // Sử dụng "requests" thay vì "items"
+        payload.put("requestId", java.util.UUID.randomUUID().toString()); // Add unique request ID
         // Include callbackUrl and workerSecret at top-level so worker can callback per-item
         if (lambdaCallbackBaseUrl != null && !lambdaCallbackBaseUrl.isEmpty()) {
             payload.put("callbackUrl", lambdaCallbackBaseUrl);

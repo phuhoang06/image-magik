@@ -1,6 +1,5 @@
 package com.example.imageservice.service;
 
-import com.example.imageservice.dto.MockupRequestDto;
 import com.example.imageservice.dto.BatchMockupRequestDto;
 import com.example.imageservice.entity.BatchMockupJob;
 import com.example.imageservice.repository.BatchMockupJobRepository;
@@ -19,6 +18,9 @@ import java.util.UUID;
 @Service
 public class BatchMockupService {
     private static final Logger log = LoggerFactory.getLogger(BatchMockupService.class);
+    
+    // Cache to track sent batch jobs to prevent duplicate Lambda invocations
+    private final java.util.Set<String> sentBatchJobs = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
     private final BatchMockupJobRepository batchMockupJobRepository;
     private final LambdaService lambdaService;
@@ -34,10 +36,16 @@ public class BatchMockupService {
     
     @Transactional
     public String createBatchMockupJobs(List<BatchMockupRequestDto> requests, String userId) {
-        String batchJobId = UUID.randomUUID().toString();
+        final String batchJobId = UUID.randomUUID().toString();
         List<Map<String, Object>> items = new java.util.ArrayList<>();
         
         log.info("Creating batch mockup jobs with batchJobId: {} for user: {}", batchJobId, userId);
+        
+        // Check if batch job already exists (idempotency check)
+        if (batchMockupJobRepository.existsByBatchJobId(batchJobId)) {
+            log.warn("Batch job {} already exists, skipping creation", batchJobId);
+            return batchJobId;
+        }
         
         for (int i = 0; i < requests.size(); i++) {
             BatchMockupRequestDto request = requests.get(i);
@@ -131,8 +139,29 @@ public class BatchMockupService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                log.info("✅ Transaction committed, now sending batch to Lambda: batchJobId={}", batchJobId);
-                lambdaService.invokeBatchMockupProcessorAsync(batchJobId, items);
+                log.info("✅ Transaction committed, now sending batch to Lambda: batchJobId={}, items={}", batchJobId, items.size());
+                
+                // Check if already sent to prevent duplicate Lambda invocations
+                if (sentBatchJobs.contains(batchJobId)) {
+                    log.warn("⚠️ Batch job {} already sent to Lambda, skipping duplicate invocation", batchJobId);
+                    return;
+                }
+                
+                try {
+                    // Mark as sent before invoking
+                    sentBatchJobs.add(batchJobId);
+                    
+                    // Add unique request ID for tracking
+                    String requestId = UUID.randomUUID().toString();
+                    log.info("🚀 Invoking Lambda with requestId={}, batchJobId={}", requestId, batchJobId);
+                    
+                    lambdaService.invokeBatchMockupProcessorAsync(batchJobId, items);
+                    log.info("🚀 Successfully sent batch to Lambda: batchJobId={}, requestId={}", batchJobId, requestId);
+                } catch (Exception e) {
+                    // Remove from cache on error so it can be retried
+                    sentBatchJobs.remove(batchJobId);
+                    log.error("❌ Failed to send batch to Lambda: batchJobId={}", batchJobId, e);
+                }
             }
         });
         
@@ -165,6 +194,21 @@ public class BatchMockupService {
         batchMockupJobRepository.save(job);
         
         log.info("Updated batch mockup job status: batchJobId={}, itemId={}, status={}", batchJobId, itemId, status);
+    }
+    
+    /**
+     * Clear sent batch jobs cache (useful for testing or manual cleanup)
+     */
+    public void clearSentBatchJobsCache() {
+        sentBatchJobs.clear();
+        log.info("Cleared sent batch jobs cache");
+    }
+    
+    /**
+     * Get count of sent batch jobs in cache
+     */
+    public int getSentBatchJobsCount() {
+        return sentBatchJobs.size();
     }
 }
 

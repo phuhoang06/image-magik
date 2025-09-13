@@ -131,4 +131,21 @@ public class MockupController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @GetMapping("/admin/cache")
+    public ResponseEntity<Map<String, Object>> getCacheInfo() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("sentBatchJobsCount", batchMockupService.getSentBatchJobsCount());
+        response.put("message", "Cache info retrieved successfully");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/admin/cache/clear")
+    public ResponseEntity<Map<String, Object>> clearCache() {
+        batchMockupService.clearSentBatchJobsCache();
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Cache cleared successfully");
+        response.put("sentBatchJobsCount", batchMockupService.getSentBatchJobsCount());
+        return ResponseEntity.ok(response);
+    }
 }
