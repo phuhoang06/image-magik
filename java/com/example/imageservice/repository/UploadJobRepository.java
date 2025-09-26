@@ -63,11 +63,6 @@ public interface UploadJobRepository extends JpaRepository<UploadJob, String> {
     @Query("SELECT j FROM UploadJob j WHERE (j.status = 'IN_PROGRESS' OR j.status = 'SENT_TO_LAMBDA') AND j.createdAt < :stuckThreshold")
     List<UploadJob> findStuckJobs(@Param("stuckThreshold") LocalDateTime stuckThreshold);
     
-    /**
-     * Get user statistics
-     */
-    @Query("SELECT COUNT(j), SUM(j.total), SUM(j.completed), SUM(j.failed) FROM UploadJob j WHERE j.userId = :userId")
-    Object[] getUserStats(@Param("userId") String userId);
     
     /**
      * Atomic increment completed count

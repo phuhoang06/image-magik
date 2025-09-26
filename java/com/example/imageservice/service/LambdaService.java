@@ -2,6 +2,7 @@ package com.example.imageservice.service;
 
 import com.example.imageservice.entity.MockupJob;
 import com.example.imageservice.dto.MockupRequestDto;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +35,8 @@ public class LambdaService {
     @Value("${aws.lambda.upload-processor}")
     private String lambdaFunctionName;
 
-    // Secret used by worker to call back BE (fallback to app.worker.secret if not set)
-    @Value("${app.lambda.worker.secret:${app.worker.secret:}}")
+    // Secret used by worker to call back BE
+    @Value("${lambda.callback.secret}")
     private String lambdaWorkerSecret;
 
     // Base URL for Lambda to call back BE (without path). Example: https://your-be-domain
@@ -44,6 +45,48 @@ public class LambdaService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private volatile LambdaClient lambdaClient;
+
+    /**
+     * Call design extraction Lambda function (synchronous)
+     */
+    public Map<String, Object> callDesignExtractionLambda(Map<String, Object> payload) {
+        try {
+            payload.put("callbackUrl", lambdaCallbackBaseUrl);
+            if (lambdaWorkerSecret != null && !lambdaWorkerSecret.isEmpty()) {
+                payload.put("workerSecret", lambdaWorkerSecret);
+            }
+
+            String json = objectMapper.writeValueAsString(payload);
+            
+            InvokeRequest invokeRequest = InvokeRequest.builder()
+                    .functionName(lambdaFunctionName)
+                    .payload(SdkBytes.fromString(json, StandardCharsets.UTF_8))
+                    .build();
+
+            InvokeResponse response = getLambdaClient().invoke(invokeRequest);
+            String responsePayload = response.payload().asString(StandardCharsets.UTF_8);
+            
+            log.info("Design extraction Lambda invoked successfully");
+            log.info("Raw Lambda response: {}", responsePayload);
+            
+            // Parse the response - Lambda returns {statusCode: 200, body: "..."}
+            Map<String, Object> wrapperResponse = objectMapper.readValue(responsePayload, new TypeReference<Map<String, Object>>() {});
+            
+            // Extract the actual response from the "body" field
+            String bodyString = (String) wrapperResponse.get("body");
+            if (bodyString != null) {
+                return objectMapper.readValue(bodyString, new TypeReference<Map<String, Object>>() {});
+            } else {
+                // If no body field, return the wrapper response directly
+                return wrapperResponse;
+            }
+            
+        } catch (Exception e) {
+            log.error("Error invoking design extraction Lambda", e);
+            throw new RuntimeException("Failed to invoke design extraction Lambda", e);
+        }
+    }
+
 
     private LambdaClient getLambdaClient() {
         if (lambdaClient == null) {
@@ -88,6 +131,9 @@ public class LambdaService {
      * Gửi job mockup sang Lambda Worker với đầy đủ options nâng cao
      */
     public void sendMockupJobToLambda(MockupJob job, MockupRequestDto request) {
+        log.info("Preparing to send MockupJob to Lambda: jobId={}, backgroundUrl={}, designUrl={}", 
+                job.getJobId(), job.getBackgroundUrl(), job.getDesignUrl());
+        
         Map<String, Object> payload = new HashMap<>();
         payload.put("jobId", job.getJobId().toString());
         payload.put("backgroundUrl", job.getBackgroundUrl());
@@ -123,8 +169,13 @@ public class LambdaService {
             payload.put("workerSecret", lambdaWorkerSecret);
         }
 
+        log.info("Sending payload to Lambda worker: jobId={}, callbackUrl={}", 
+                job.getJobId(), lambdaCallbackBaseUrl);
+        
         // fire-and-forget
         sendToWorker(payload);
+        
+        log.info("MockupJob payload sent to Lambda worker: jobId={}", job.getJobId());
     }
 
     /**
@@ -151,7 +202,6 @@ public class LambdaService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("jobId", jobId);
         payload.put("requests", requests); // Sử dụng "requests" thay vì "items"
-        payload.put("requestId", java.util.UUID.randomUUID().toString()); // Add unique request ID
         // Include callbackUrl and workerSecret at top-level so worker can callback per-item
         if (lambdaCallbackBaseUrl != null && !lambdaCallbackBaseUrl.isEmpty()) {
             payload.put("callbackUrl", lambdaCallbackBaseUrl);

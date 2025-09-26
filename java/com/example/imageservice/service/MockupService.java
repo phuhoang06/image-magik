@@ -6,8 +6,8 @@ import com.example.imageservice.repository.MockupJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -24,6 +24,7 @@ public class MockupService {
         this.lambdaService = lambdaService;
     }
 
+    @Transactional
     public MockupJob createMockupJob(MockupRequestDto request, String userId) {
         log.info("Creating mockup job - backgroundUrl: '{}', designUrl: '{}'",
                 request.getBackgroundUrl(), request.getDesignUrl());
@@ -58,8 +59,30 @@ public class MockupService {
 
         // Luôn gửi mockup jobs đến Lambda để xử lý toàn bộ pipeline
         mockupJob.setStatus(MockupJob.JobStatus.SENT_TO_LAMBDA);
+        
+        log.info("Saving MockupJob to database: jobId={}, status={}", jobId, mockupJob.getStatus());
         MockupJob savedJob = mockupJobRepository.save(mockupJob);
-        CompletableFuture.runAsync(() -> lambdaService.sendMockupJobToLambda(savedJob, request));
+        log.info("MockupJob saved successfully: jobId={}, id={}", savedJob.getJobId(), savedJob.getJobId());
+        
+        // Verify job was saved correctly
+        MockupJob verifyJob = mockupJobRepository.findByJobId(jobId).orElse(null);
+        if (verifyJob == null) {
+            log.error("CRITICAL: MockupJob not found after save! jobId={}", jobId);
+            throw new RuntimeException("Failed to save MockupJob to database");
+        } else {
+            log.info("MockupJob verification successful: jobId={}", verifyJob.getJobId());
+        }
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                log.info("Sending MockupJob to Lambda: jobId={}", savedJob.getJobId());
+                lambdaService.sendMockupJobToLambda(savedJob, request);
+                log.info("MockupJob sent to Lambda successfully: jobId={}", savedJob.getJobId());
+            } catch (Exception e) {
+                log.error("Failed to send MockupJob to Lambda: jobId={}", savedJob.getJobId(), e);
+            }
+        });
+        
         return savedJob;
     }
 

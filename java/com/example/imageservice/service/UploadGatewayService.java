@@ -23,7 +23,6 @@ public class UploadGatewayService {
     private final UploadJobRepository uploadJobRepository;
     private final UploadItemRepository uploadItemRepository;
     private final LambdaService lambdaService;
-    private final RateLimitService rateLimitService;
     
     @Value("${image-service.max-urls-per-request:50}")
     private int maxUrlsPerRequest;
@@ -312,20 +311,4 @@ public class UploadGatewayService {
         }
     }
     
-    /**
-     * Health check - count active jobs
-     */
-    public java.util.Map<String, Object> getHealthStats() {
-        long pendingJobs = uploadJobRepository.countByStatus(UploadJob.JobStatus.PENDING);
-        long inProgressJobs = uploadJobRepository.countByStatus(UploadJob.JobStatus.IN_PROGRESS);
-        long sentToLambdaJobs = uploadJobRepository.countByStatus(UploadJob.JobStatus.SENT_TO_LAMBDA);
-        
-        return java.util.Map.of(
-            "pendingJobs", pendingJobs,
-            "inProgressJobs", inProgressJobs,
-            "sentToLambdaJobs", sentToLambdaJobs,
-            "totalActiveJobs", pendingJobs + inProgressJobs + sentToLambdaJobs,
-            "lambdaHealthy", lambdaService.isLambdaHealthy()
-        );
-    }
 }

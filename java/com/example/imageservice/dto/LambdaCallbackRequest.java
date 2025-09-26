@@ -14,7 +14,6 @@ import java.time.Instant;
 @Builder
 public class LambdaCallbackRequest {
     
-    @NotNull(message = "Job ID cannot be null")
     private String jobId;
     
     private String itemId;

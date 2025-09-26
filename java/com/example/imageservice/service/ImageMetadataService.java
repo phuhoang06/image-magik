@@ -74,31 +74,6 @@ public class ImageMetadataService {
         return items.map(this::convertToMetadataDto);
     }
     
-    /**
-     * Lấy thống kê metadata của user
-     */
-    public ImageMetadataStats getUserMetadataStats(String userId) {
-        List<UploadItem> userItems = uploadItemRepository.findByUploadJobUserId(userId);
-        
-        return ImageMetadataStats.builder()
-                .totalImages(userItems.size())
-                .totalSizeBytes(userItems.stream()
-                        .mapToLong(item -> item.getSizeBytes() != null ? item.getSizeBytes() : 0)
-                        .sum())
-                .formats(userItems.stream()
-                        .map(UploadItem::getFormat)
-                        .filter(format -> format != null)
-                        .collect(Collectors.groupingBy(format -> format, Collectors.counting())))
-                .averageWidth(userItems.stream()
-                        .mapToInt(item -> item.getWidth() != null ? item.getWidth() : 0)
-                        .average()
-                        .orElse(0.0))
-                .averageHeight(userItems.stream()
-                        .mapToInt(item -> item.getHeight() != null ? item.getHeight() : 0)
-                        .average()
-                        .orElse(0.0))
-                .build();
-    }
     
     /**
      * Chuyển đổi UploadItem thành ImageMetadataDto
@@ -151,67 +126,4 @@ public class ImageMetadataService {
                 .build();
     }
     
-    /**
-     * DTO cho thống kê metadata
-     */
-    public static class ImageMetadataStats {
-        private int totalImages;
-        private long totalSizeBytes;
-        private java.util.Map<String, Long> formats;
-        private double averageWidth;
-        private double averageHeight;
-        
-        // Getters and setters
-        public int getTotalImages() { return totalImages; }
-        public void setTotalImages(int totalImages) { this.totalImages = totalImages; }
-        
-        public long getTotalSizeBytes() { return totalSizeBytes; }
-        public void setTotalSizeBytes(long totalSizeBytes) { this.totalSizeBytes = totalSizeBytes; }
-        
-        public java.util.Map<String, Long> getFormats() { return formats; }
-        public void setFormats(java.util.Map<String, Long> formats) { this.formats = formats; }
-        
-        public double getAverageWidth() { return averageWidth; }
-        public void setAverageWidth(double averageWidth) { this.averageWidth = averageWidth; }
-        
-        public double getAverageHeight() { return averageHeight; }
-        public void setAverageHeight(double averageHeight) { this.averageHeight = averageHeight; }
-        
-        public static ImageMetadataStatsBuilder builder() {
-            return new ImageMetadataStatsBuilder();
-        }
-        
-        public static class ImageMetadataStatsBuilder {
-            private ImageMetadataStats stats = new ImageMetadataStats();
-            
-            public ImageMetadataStatsBuilder totalImages(int totalImages) {
-                stats.totalImages = totalImages;
-                return this;
-            }
-            
-            public ImageMetadataStatsBuilder totalSizeBytes(long totalSizeBytes) {
-                stats.totalSizeBytes = totalSizeBytes;
-                return this;
-            }
-            
-            public ImageMetadataStatsBuilder formats(java.util.Map<String, Long> formats) {
-                stats.formats = formats;
-                return this;
-            }
-            
-            public ImageMetadataStatsBuilder averageWidth(double averageWidth) {
-                stats.averageWidth = averageWidth;
-                return this;
-            }
-            
-            public ImageMetadataStatsBuilder averageHeight(double averageHeight) {
-                stats.averageHeight = averageHeight;
-                return this;
-            }
-            
-            public ImageMetadataStats build() {
-                return stats;
-            }
-        }
-    }
 }

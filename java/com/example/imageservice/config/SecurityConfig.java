@@ -1,12 +1,15 @@
 
 package com.example.imageservice.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -18,8 +21,10 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-
 public class SecurityConfig {
+    
+    @Value("${jwt.jwks-url}")
+    private String jwksUrl;
     
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -32,25 +37,33 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/api/v1/health").permitAll()
                 .requestMatchers("/api/v1/lambda/**").permitAll() // Lambda endpoints (protected by WorkerSecretFilter)
+                       .requestMatchers("/api/v1/designs/health").permitAll() // Design detection health check
+                       .requestMatchers("/api/v1/designs/test").permitAll() // Design detection test endpoint
+                       .requestMatchers("/api/v1/designs/test-detect").permitAll() // Design detection test with image
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/actuator/info").permitAll()
                 .requestMatchers("/actuator/metrics").permitAll()
                 .requestMatchers("/actuator/prometheus").permitAll()
                 // H2 Console (only for development)
                 .requestMatchers("/h2-console/**").permitAll()
-                // All other endpoints require authentication (handled by Resource Server)
+                // All other endpoints require authentication
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
             .headers(headers -> headers
                 .frameOptions(frameOptions -> frameOptions.deny())
-                .contentTypeOptions(contentTypeOptions -> contentTypeOptions.and())
+                .contentTypeOptions(Customizer.withDefaults())
                 .httpStrictTransportSecurity(hstsConfig -> hstsConfig
                     .maxAgeInSeconds(31536000)
                 )
             );
             
         return http.build();
+    }
+    
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        return NimbusJwtDecoder.withJwkSetUri(jwksUrl).build();
     }
     
     @Bean

@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -17,16 +18,16 @@ import java.io.IOException;
 @Slf4j
 public class WorkerSecretFilter extends OncePerRequestFilter {
     
-    @Value("${app.worker.secret:}")
+    @Value("${lambda.callback.secret}")
     private String expectedWorkerSecret;
     
     @Value("${app.worker.enabled:false}")
     private boolean workerSecretEnabled;
     
     @Override
-    protected void doFilterInternal(HttpServletRequest request, 
-                                  HttpServletResponse response, 
-                                  FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request, 
+                                  @NonNull HttpServletResponse response, 
+                                  @NonNull FilterChain filterChain) throws ServletException, IOException {
         
 
         
@@ -74,7 +75,7 @@ public class WorkerSecretFilter extends OncePerRequestFilter {
     }
     
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         // Chỉ filter cho lambda callback endpoint
         return !request.getRequestURI().equals("/api/v1/lambda/callback");
     }

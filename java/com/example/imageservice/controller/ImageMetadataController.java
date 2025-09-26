@@ -153,27 +153,6 @@ public class ImageMetadataController {
         }
     }
 
-    /**
-     * Lấy thống kê metadata của user
-     * GET /api/v1/metadata/stats
-     */
-    @GetMapping("/stats")
-    public ResponseEntity<?> getUserMetadataStats(@AuthenticationPrincipal Jwt jwt) {
-
-        try {
-            String userId = getUserId(jwt);
-            log.debug("Stats request from user {}", userId);
-
-            var stats = imageMetadataService.getUserMetadataStats(userId);
-
-            return ResponseEntity.ok(stats);
-
-        } catch (Exception e) {
-            log.error("Failed to get user metadata stats: {}", e.getMessage(), e);
-            return ResponseEntity.status(500)
-                    .body(Map.of("error", "INTERNAL_ERROR", "message", "Failed to get user metadata stats"));
-        }
-    }
 
     /**
      * Lấy ảnh theo format

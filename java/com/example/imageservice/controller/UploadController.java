@@ -5,7 +5,6 @@ import com.example.imageservice.dto.UploadResponse;
 import com.example.imageservice.dto.JobStatusResponse;
 
 import com.example.imageservice.entity.UploadJob;
-import com.example.imageservice.entity.UploadItem;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +30,7 @@ public class UploadController {
     private final UploadGatewayService uploadGatewayService;
     private final RateLimitService rateLimitService;
 
-    @Value("${lambda.callback.secret:}")
+    @Value("${lambda.callback.secret}")
     private String lambdaCallbackSecretProperty;
 
     /**
@@ -277,25 +276,6 @@ public class UploadController {
         }
     }
 
-    /**
-     * Health check endpoint
-     * GET /api/v1/health
-     */
-    @GetMapping("/health")
-    public ResponseEntity<?> healthCheck() {
-        try {
-            Map<String, Object> healthStats = uploadGatewayService.getHealthStats();
-            healthStats.put("status", "UP");
-            healthStats.put("timestamp", java.time.LocalDateTime.now());
-
-            return ResponseEntity.ok(healthStats);
-
-        } catch (Exception e) {
-            log.error("Health check failed: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("status", "DOWN", "error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
-        }
-    }
 
     /**
      * Extract JWT token from Authorization header
@@ -319,16 +299,6 @@ public class UploadController {
         return "anonymous";
     }
 
-    private String resolveWorkerSecret() {
-        if (lambdaCallbackSecretProperty != null && !lambdaCallbackSecretProperty.isBlank()) {
-            return lambdaCallbackSecretProperty;
-        }
-        String sysProp = System.getProperty("lambda.callback.secret");
-        if (sysProp != null && !sysProp.isBlank()) {
-            return sysProp;
-        }
-        return System.getenv("LAMBDA_CALLBACK_SECRET");
-    }
 
     /**
      * Exception handler for validation errors
